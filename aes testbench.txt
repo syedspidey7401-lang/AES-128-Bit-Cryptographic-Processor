@@ -1,0 +1,178 @@
+
+
+module testbench;
+
+    reg clk;
+    reg rst;
+    reg start;
+
+    reg  [127:0] plaintext;
+    reg  [127:0] secretkey;
+
+    wire done;
+    wire [127:0] ciphertext;
+
+    // ============================================================
+    // DUT
+    // ============================================================
+    aes_top dut (
+        .clk        (clk),
+        .rst        (rst),
+        .start      (start),
+        .plaintext  (plaintext),
+        .secretkey  (secretkey),
+        .done       (done),
+        .ciphertext (ciphertext)
+    );
+
+    // ============================================================
+    // Clock: 10 ns period
+    // ============================================================
+    initial begin
+        clk = 1'b0;
+        forever #5 clk = ~clk;
+    end
+
+    // ============================================================
+    // VCD waveform
+    // ============================================================
+    initial begin
+        $dumpfile("aes.vcd");
+        $dumpvars(0, testbench);
+    end
+
+    // ============================================================
+    // AES-128 FIPS-197 Known Answer Test
+    //
+    // Plaintext :
+    // 3243f6a8885a308d313198a2e0370734
+    //
+    // Key :
+    // 2b7e151628aed2a6abf7158809cf4f3c
+    //
+    // Expected Ciphertext :
+    // 3925841d02dc09fbdc118597196a0b32
+    // ============================================================
+    initial begin
+
+        // Initial values
+        rst        = 1'b1;
+        start      = 1'b0;
+        plaintext  = 128'h3243f6a8885a308d313198a2e0370734;
+        secretkey  = 128'h2b7e151628aed2a6abf7158809cf4f3c;
+
+        // --------------------------------------------------------
+        // Reset
+        // --------------------------------------------------------
+        #20;
+        rst = 1'b0;
+
+        // --------------------------------------------------------
+        // Start encryption
+        // --------------------------------------------------------
+        #10;
+        start = 1'b1;
+
+        #10;
+        start = 1'b0;
+
+        // --------------------------------------------------------
+        // Wait until AES asserts DONE
+        // --------------------------------------------------------
+        wait(done == 1'b1);
+
+        // Give one clock period for registered ciphertext
+        @(posedge clk);
+        #1;
+
+        // ========================================================
+        // Final result
+        // ========================================================
+        $display("");
+        $display("============================================");
+        $display("             AES-128 RESULT");
+        $display("============================================");
+        $display("Plaintext  : %h", plaintext);
+        $display("Key        : %h", secretkey);
+        $display("Ciphertext : %h", ciphertext);
+        $display("Expected   : %h",
+                 128'h3925841d02dc09fbdc118597196a0b32);
+        $display("============================================");
+
+        if (ciphertext == 128'h3925841d02dc09fbdc118597196a0b32) begin
+            $display("             AES TEST PASSED");
+            $display("============================================");
+        end
+        else begin
+            $display("             AES TEST FAILED");
+            $display("============================================");
+        end
+
+        // --------------------------------------------------------
+        // Stop simulation
+        // --------------------------------------------------------
+        #20;
+        $finish;
+
+    end
+
+    // ============================================================
+    // Monitor FSM
+    // ============================================================
+    always @(posedge clk) begin
+
+        $display(
+            "TIME=%0t | ROUND=%0d | DONE=%b | STATE=%h | OUTPUT=%h",
+            $time,
+            dut.round,
+            done,
+            dut.state,
+            dut.roundkey_o
+        );
+
+    end
+
+    // ============================================================
+    // Print round keys
+    //
+    // These are extremely useful for debugging.
+    // Expected:
+    //
+    // RK0  = 2b7e151628aed2a6abf7158809cf4f3c
+    // RK1  = a0fafe1788542cb123a339392a6c7605
+    // RK2  = f2c295f27a96b9435935807a7359f67f
+    // RK3  = 3d80477d4716fe3e1e237e446d7a883b
+    // RK4  = ef44a541a8525b7fb671253bdb0bad00
+    // RK5  = d4d1c6f87c839d87caf2b8bc11f915bc
+    // RK6  = 6d88a37a110b3efddbf98641ca0093fd
+    // RK7  = 4e54f70e5f5fc9f384a64fb24ea6dc4f
+    // RK8  = ead27321b58dbad2312bf5607f8d292f
+    // RK9  = ac7766f319fadc2128d12941575c006e
+    // RK10 = d014f9a8c9ee2589e13f0cc8b6630ca6
+    // ============================================================
+    initial begin
+
+        #1;
+
+        $display("");
+        $display("============================================");
+        $display("             AES ROUND KEYS");
+        $display("============================================");
+
+        $display("RK0  = %h", dut.rk0);
+        $display("RK1  = %h", dut.rk1);
+        $display("RK2  = %h", dut.rk2);
+        $display("RK3  = %h", dut.rk3);
+        $display("RK4  = %h", dut.rk4);
+        $display("RK5  = %h", dut.rk5);
+        $display("RK6  = %h", dut.rk6);
+        $display("RK7  = %h", dut.rk7);
+        $display("RK8  = %h", dut.rk8);
+        $display("RK9  = %h", dut.rk9);
+        $display("RK10 = %h", dut.rk10);
+
+        $display("============================================");
+        $display("");
+
+    end
+endmodule

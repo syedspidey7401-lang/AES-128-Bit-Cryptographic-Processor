@@ -1,0 +1,5 @@
+Things to write in the book:
+aes lut box
+bytes bo,b1,b2
+why function and case in subbytes(because we need to create a sub box to call different entries)
+galios equation expain

@@ -1,0 +1,78 @@
+module aes_top(clk,rst,start,plaintext,secretkey,done,ciphertext);
+   input clk;
+    input rst;
+    input start;
+  input [127:0] plaintext;
+  input [127:0] secretkey;
+  output reg [127:0] ciphertext;
+    output done;
+  // 1st step:calling fsm
+  wire [3:0]round;
+  //2nd step:calling round keys
+  wire[127:0]rk0,rk1,rk2,rk3,rk4;
+  wire[127:0]rk5,rk6,rk7,rk8,rk9,rk10;
+  //3rd step: calling datapath outputs
+  reg  [127:0] state;
+  wire [127:0] sub_out;//from subytes
+  wire [127:0] shift_out; //from shiftrows
+  wire [127:0] mix_out;// from mixcolumns
+  wire [127:0] roundkey_o;//from roundkey
+  //4th step: instantiating fsm controller
+  fsmcontr fs(.clk(clk),.rst(rst),.start(start),.round(round),.done(done));
+  //5th step: instantiating keyexpansions
+  keyexpansion_128 keygen(.key(key),.rk0(rk0),.rk1(rk1),.rk2(rk2),.rk3(rk3),.rk4(rk4),.rk5(rk5),.rk6(rk6),.rk7(rk7),.rk8(rk8),.rk9(rk9),.rk10(rk10));
+ //6th step:instantiating subbytes
+  sb sub(.s_in(state),.s_out(sub_out));
+   //7th step:instantiating shiftrows
+  shiftr sif(.state_in(sub_out),.s_out(shift_out));
+   //8th step:instantiating mixcolumns
+  mixcoloumns_128 mdf(.state(shift_out),.out(mix_out));
+  
+  //creating a round key selector to select rounds
+  reg [127:0]current_key;
+  always@(*)
+    begin
+      case(round)
+        4'd0: current_key=rk0;
+        4'd1: current_key=rk1;
+        4'd2: current_key=rk2;
+        4'd3: current_key=rk3;
+        4'd4: current_key=rk4;
+        4'd5: current_key=rk5;
+        4'd6: current_key=rk6;
+        4'd7: current_key=rk7;
+        4'd8: current_key=rk8;
+        4'd9: current_key=rk9;
+        4'd10: current_key=rk10;
+        default: current_key=rk0;
+      endcase
+    end
+   //since we dont require mix coloumns after 10th round,we create a mux opr for round 10
+  wire[127:0] round_state;
+  assign round_state=(round==4'd10)? shift_out:mix_out;
+   //9th step:instantiating roundkey
+  iniroundkey rdky(.st_i(round_state),.round_z(current_key),.st_o(roundkey_o));
+
+  //declaring final state
+  always@(posedge clk)
+    begin
+      if(rst)
+        begin
+        state<=128'b0; //holding values to 0
+      ciphertext<=128'b0;
+        end
+      else if(start)
+        begin
+          state<=plaintext^rk0; //xor with initial round key
+        end
+      else if(round >0 && round<10)
+        state<=rounkey_o; //round 1-round 9
+      else if(round==10)
+        state<=roundkey_o; //round 10
+      else
+        begin
+          state<=state;//hold values
+          ciphertext<=ciphertext;
+        end
+    end
+  
